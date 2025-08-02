@@ -1,0 +1,211 @@
+{
+  "name": "FitCoach AI",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "workout-quiz",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "9610d3b4-3bd7-4ba3-bb00-efae4591df65",
+      "name": "Tally Quiz Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        -64
+      ],
+      "webhookId": "workout-quiz-webhook"
+    },
+    {
+      "parameters": {
+        "id": 8352262,
+        "email": "={{ $('Tally Quiz Webhook').item.json.body.data.fields[2].value }}",
+        "additionalFields": {
+          "firstName": "={{ $('Tally Quiz Webhook').item.json.body.data.fields[0].value }}"
+        }
+      },
+      "id": "fc4a450d-ab0c-4b53-815e-c52cf082f955",
+      "name": "Send Email via ConvertKit",
+      "type": "n8n-nodes-base.convertKit",
+      "typeVersion": 1,
+      "position": [
+        608,
+        64
+      ],
+      "credentials": {
+        "convertKitApi": {
+          "id": "SaRRaoNKtC40ObYH",
+          "name": "ConvertKit account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Client Info:\n- Name: {{ $json.full_name }}\n- Fitness Level: {{ $json[\"what_s_your_current_fitness_level\"] }}\n- Fitness Goal: {{ $json[\"what_s_your_primary_fitness_goal\"] }}\n- Equipment: {{ $json[\"what_equipment_do_you_have_access_to\"] }}\n- Time Available: {{ $json[\"how_much_time_can_you_dedicate_per_workout_session\"] }}\n- Experience: {{ $json[\"how_would_you_describe_your_exercise_experience\"] }}\n- Health Issues: {{ $json[\"do_you_have_any_injuries_physical_limitations_or_health_conditions_we_should_consider\"] || \"None\" }}\n",
+        "options": {
+          "systemMessage": "=You are a certified fitness and nutrition coach.\n\nBased on the following client intake form, generate a personalized 7-day workout and meal plan. Format your response using clean HTML only — no markdown or plain text. Use headings (<h2>, <h3>), lists (<ul>, <li>), and paragraphs (<p>) for structure. Do not use inline styles. Keep the layout readable and well-spaced for email delivery.\n\nClient Info:\n- Full Name: {{ $json.full_name }}\n- Email: {{ $json.email_address }}\n- Fitness Level: {{ $json.what_s_your_current_fitness_level }}\n- Primary Fitness Goal: {{ $json.what_s_your_primary_fitness_goal }}\n- Equipment Access: {{ $json.what_equipment_do_you_have_access_to }}\n- Workout Duration: {{ $json.how_much_time_can_you_dedicate_per_workout_session }}\n- Exercise Experience: {{ $json.how_would_you_describe_your_exercise_experience }}\n- Physical Limitations or Health Conditions: {{ $json.limitations || \"None\" }}\n\nInstructions:\n1. Create a detailed 7-day workout plan tailored to the user's goal, fitness level, equipment, and time availability.\n   - For each day, include: a workout focus, 3–5 exercises with sets and reps, and a short coaching tip.\n   - Use HTML list formatting (<ul><li>) for each day’s workouts.\n\n2. Include one simple meal suggestion per day, based on their fitness goal.\n\n3. Use a friendly, supportive tone that feels personal and motivating.\n\n4. At the end, include:\n   - One short motivational quote (inside a <blockquote>)\n   - A sign-off message like this:\n     <p>Stay strong,<br><strong>{{ $json.full_name }}</strong><br>Founder, FitCoach AI</p>\n\nDo not use \"**\" for bolding — instead use proper <strong> or heading tags for emphasis.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        160,
+        -64
+      ],
+      "id": "f39956af-1630-46b3-bdd5-798a8fa81a59",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        160,
+        144
+      ],
+      "id": "ca9b0d07-b1ea-456f-911e-d4bbd5937e27",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "XGESSot6FrgXIw9H",
+          "name": "Groq account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const fields = $json.body?.data?.fields || [];\n\nconst output = Object.create(null); // creates a clean, plain object\n\nfor (const field of fields) {\n  if (field.label && field.value) {\n    const key = field.label\n      .replace(/\\n/g, '')\n      .toLowerCase()\n      .replace(/[^a-z0-9]+/g, '_')\n      .replace(/^_|_$/g, '');\n\n    output[key] = field.value.trim();\n  }\n}\n\n// Return a properly structured object for n8n\nreturn {\n  json: Object.assign({}, output)\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        -64
+      ],
+      "id": "f7a48886-03a7-437f-9dda-c454432f8c8b",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Tally Quiz Webhook').item.json.body.data.fields[2].value }}",
+        "subject": "7 day workout Plan",
+        "message": "={{ $json.output }}",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "FitCoach AI"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        592,
+        -192
+      ],
+      "id": "01be89ee-c2ab-4272-839d-81d073487387",
+      "name": "Send a message",
+      "webhookId": "3f430e69-5360-43e7-8dd4-72b3a420d143",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "hbIYo1yfWu1BLww0",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        304,
+        144
+      ],
+      "id": "5eca7438-a536-4346-be46-5a4f17a866d8",
+      "name": "Simple Memory"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Tally Quiz Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email via ConvertKit": {
+      "main": [
+        []
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Email via ConvertKit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8e2bff33-b7c2-445a-9407-0112c0bb0faf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7cac9a7a0a63812e41b1e94b1b69e3ffef7529633b7e9b913fb43b82dc581723"
+  },
+  "id": "RzFLQ0BKX42JqFSJ",
+  "tags": []
+}
